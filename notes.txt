@@ -1,0 +1,46 @@
+1. unzip files
+   unzip niranjan_addanki_2018_02_24_data_engineer.zip
+
+2. requirements
+   i. Valid installation of mysql client and python2.7.
+   (Debian) sudo apt-get install libmysqlclient-dev
+   (Fedora) yum install libmysqlclient-dev
+
+   ii. install required libraries
+    pip install -r requirements.txt
+
+   iii. I am using spark 2.2 for the assessment in local mode. if spark 2.2 is not installed, please download and install spark binaries
+    https://www.apache.org/dyn/closer.lua/spark/spark-2.2.1/spark-2.2.1-bin-hadoop2.7.tgz
+
+
+3. run script
+
+spark-submit --jars mysql-connector-java-5.1.45-bin.jar \
+--driver-class-path mysql-connector-java-5.1.45-bin.jar \
+--executor-memory 2G \
+--executor-cores 4 \
+--driver-cores 10 \
+--driver-memory 3G \
+python/main.py
+
+4. tests
+ i. run tests (8 tests successful execution)
+    pytest python/test_main.py
+ ii. style checks (~9 rank)
+     pylint python/*.py
+
+5. Additional Information
+
+ ii. I am using mysql jar file for jdbc connection to live works data base
+ iii. Available options
+  --cache, -c           Cache input from liveworks and cogo labs
+  --limit LIMIT, -d LIMIT
+                        Limit data from live works and cogo labs
+  --log_level LOG_LEVEL, -l LOG_LEVEL
+                        Set loglevel for debugging and analyis
+  --master MASTER, -m MASTER
+                        Set master for spark application
+
+
+
+

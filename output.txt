@@ -1,0 +1,25 @@
+Total average run time - (mid day - 270 seconds , morning early hours - 65 seconds  ) (i5 processor and 8 GB RAM)
+Number of Unique users (emd5) present in both cogo labs and liveworks - 301031
+Number of Unique users (emd5) present only in cogo labs data - 335371
+Number of Unique users (emd5) present only in liveworks data - 336119
+Percentage of users having different job titles within both datasets 99.8501815428
+00169b6d6ecf92006e7f3fb5af271b90,"[{\"Patent examiner\":\"Delgado Group\"}]","[{\"Engineering geologist\":\"Mercer, Turner and Pierce\"}]"
+009653cb2490dc3242b80040c29db9fb,"[{\"Lighting technician, broadcasting/film/video\":\"Hart Inc\"}]","[{\"Architect\":\"Jackson-Lopez\"}]"
+00eb3c47db65d9d71736b3b1cefa454a,"[{\"Commercial art gallery manager\":\"Powell LLC\"}]","[{\"Community pharmacist\":\"Beck-King\"}]"
+0141de4440334e683c9c1cc196cb06ed,"[{\"Bonds trader\":\"Hernandez-Norris\"}]","[{\"Outdoor activities/education manager\":\"Martin LLC\"}]"
+0180d26e414c2660da2fcf933f9fba71,"[{\"Orthoptist\":\"Manning, Morgan and Smith\"}]","[{\"Engineer, maintenance (IT)\":\"Delgado Inc\"}]"
+01a25c002e56524e7c38355ab94bc505,"[{\"Diplomatic Services operational officer\":\"Diaz-Mays\"}]","[{\"Research officer, government\":\"Dennis-Galloway\"}]"
+01c73da60e17bc4404393ef91846b779,"[{\"Television production assistant\":\"Joyce Group\"}]","[{\"Transport planner\":\"Decker LLC\"}]"
+01d3d5f1e22f486d6e7ec7f76d7f5c95,"[{\"Engineer, structural\":\"Ross-Cruz\"}]","[{\"Radio producer\":\"Walker and Sons\"}]"
+01e0f2be2e4c4105c78d57676739e918,"[{\"Waste management officer\":\"Zavala, White and Stevens\"}]","[{\"Estate agent\":\"Manning, Wells and Coleman\"}]"
+01f1b995b56a9b19e10cb3762f1a712b,"[{\"Solicitor\":\"Brown, Booker and Jones\"}]","[{\"Investment banker, operational\":\"Rosales, Scott and Pearson\"}]"
+Create Table EMPLOYEE_INFO(
+  EMD5 VARCHAR(50),
+  COGOLABS_JSON JSON,
+  LIVEWORKS_JSON JSON
+);
+LOAD DATA LOCAL INFILE 'path/to/spark/final_output/csv'
+INTO TABLE test
+FIELDS TERMINATED BY ','
+ENCLOSED BY '"'
+LINES TERMINATED BY '\n';
