@@ -19,6 +19,7 @@ from pyspark.sql.types import StringType, StructType, StructField
 from pyspark import StorageLevel
 from utility import create_directory, remove_directory
 
+
 config = configparser.ConfigParser()
 config.read("variables.ini")
 
@@ -42,6 +43,17 @@ def generate_cogo_labs_data():
     """
     Generate json file from cogo labs api
     :return:
+
+    Parse json file to form array of json
+    api response
+    {"rows":[{"id":1,"name":"Vanessa Thomas","address":"87826 Ford Canyon Reeseport, WI 70426","birthdate":"1971-02-22","sex":"F","job":
+    "Advice worker","company":"May, Lee and Jackson","emd5":"00001552528'}],"num_rows":1}
+
+    Parse data and cleanse it as array of json.
+
+    [{"id":1,"name":"Vanessa Thomas","address":"87826 Ford Canyon Reeseport, WI 70426","birthdate":"1971-02-22","sex":"F","job":
+    "Advice worker","company":"May, Lee and Jackson","emd5":"00001552528'}]
+
     """
     response = requests.get(COGO_LABS_URL)
     response_metadata_regex = re.compile(r"\"num_rows\":\d*\}")
@@ -83,6 +95,8 @@ class App(object):
         """
         self.args = args
         master = self.args.master if args else "local[*]"
+        # pass mysql drivers to spark executor and driver for execution
+
         self.spark = SparkSession.builder \
             .appName("Cogo labs assessment test") \
             .config("spark.driver.extraClassPath", "mysql-connector-java-5.1.45-bin.jar") \
@@ -105,8 +119,12 @@ class App(object):
             logger.info("Creating liveworks dataframe from cached data")
             self._liveworks_df = self.spark.read.parquet("spark-warehouse/liveworks/*.parquet")
         else:
+            # read from jdbc url
             self._liveworks_df = self.spark.read.jdbc(LIVE_WORKS_JDBC_URL, table="cogo_list_v1", properties=PROPERTIES)
+            # TODO:
+            # add refresh option to reload cache data
             if self.args.cache:
+                # cache data for future use
                 logger.info("Caching live works data for next run")
                 self._liveworks_df.write.saveAsTable("liveworks")
 
@@ -123,13 +141,18 @@ class App(object):
             logger.info("Creating cogolabs dataframe from cached data")
             self._cogo_labs_df = self.spark.read.parquet("spark-warehouse/cogolabs/*.parquet")
         else:
+            # get / download data from cogo labs api
             generate_cogo_labs_data()
             columns = "address birthdate company emd5 id job name sex"
+            # Generate schema
             cogo_labs_schema = StructType(
                 [StructField(column, StringType(), True) for column in columns.split(" ")])
+            # create cogo labs dataframe using schema
             self._cogo_labs_df = self.spark.read.json("data/cogo_chunks.txt", cogo_labs_schema)
             self._cogo_labs_df = self._cogo_labs_df.toDF(
                 *("cogo_" + str(column) for column in self._cogo_labs_df.columns))
+            # TODO:
+            # add refresh option to reload cache data
             if self.args.cache:
                 logger.info("Caching cogo labs data for next run")
                 self._cogo_labs_df.write.saveAsTable("cogolabs")
@@ -144,6 +167,7 @@ class App(object):
         logger.info("Creating Join dataframe from cogo labs and live works data frame")
         cogo_labs_df = self.cogo_labs_df
         live_works_df = self.live_works_df
+        # create join dataframe
         self._join_df = cogo_labs_df.join(live_works_df, live_works_df.emd5 == cogo_labs_df.cogo_emd5, "fullouter") \
             .select(live_works_df.emd5, live_works_df.name, live_works_df.job, live_works_df.company
                      , cogo_labs_df.cogo_emd5, cogo_labs_df.cogo_name, cogo_labs_df.cogo_job,
@@ -180,6 +204,37 @@ class App(object):
 
         # Create dataframes for intersection , cogo labs and liveworks only dataframes
         logger.info(" Creating common dataframe emd5 present both in live works and cogo labs")
+        """
+        Cogo labs
+        emd5    Name
+        1       Sam
+        2       Henry
+        
+        Liveworks
+        emd5    Name
+        2       John
+        3       Smith
+        
+        Full Outer Join
+        c_emd5    l_emd5   c_name  l_name
+        1           Null     Sam     Null
+        2           2       Henry   John
+        Null        3        Null    Smith
+        
+        Intersection from cogo labs and Live works, where c_emd5 and l_emd5 is not null
+        c_emd5    l_emd5   c_name  l_name
+        2           2       Henry   John   
+        
+        Users only from cogo labs, where c_emd5 is not null and l_emd5 is null
+        c_emd5    l_emd5   c_name  l_name
+        1           Null     Sam     Null
+        
+        Users only from live works, where l_emd is not null and c_emd5 is null
+        c_emd5    l_emd5   c_name  l_name
+        Null        3        Null    Smith
+        
+        """
+
         common_df = join_df.filter(~join_df.emd5.isNull() & ~join_df.cogo_emd5.isNull())
         logger.info(" Creating cogo labs only dataframe where emd5 present in cogo labs and not present in live works")
         cogo_labs_only_df = join_df.filter(~join_df.cogo_emd5.isNull() & join_df.emd5.isNull())
@@ -199,7 +254,7 @@ class App(object):
         logger.info("Creating common job data frame where common users have same job title")
         common_job_df = common_df.where(common_df.cogo_job == common_df.job)
         common_job_df.persist(StorageLevel.DISK_ONLY)
-        print ("Output with common emd5 users having same job title")
+        print("Output with common emd5 users having same job title")
         common_job_df.show()
         common_job_count = common_job_df.count()
 
@@ -210,10 +265,30 @@ class App(object):
         logger.info("Percent have different job titles in intersection %s", different_jobs_percent)
 
         # jsonsify data from common data frame
+        """
+        Create Key:Value pair
+        Key = Job title , Value = Company Name
+        
+        cogolabs_emd5   cogolabs_job    cogolabs_company    liveworks_job   liveworks_company
+        1              Hotel manager     Bender PLC          Barrister           Brown PLC
+        1            Immigration officer Diaz Ltd                                           
+        
+        cogolabs_emd5   cogo_labs_c                         liveworks_c
+        1               {"Hotel manager":"Bender PLC"}      {"Barrister":"Brown PLC"}
+        1               {"Immigration officer":"Diaz Ltd"} 
+        """
+
         common_json_df = common_df.withColumn("live_works_c", concat(lit("{\""), common_df.job, lit("\":\""),
                                                                      common_df.company, lit("\"}"))) \
             .withColumn("cogo_labs_c", concat(lit("{\""), common_df.cogo_job,
                                               lit("\":\""), common_df.cogo_company, lit("\"}")))
+
+        """
+        Concatenate results to form Array of key value pairs group by emd5
+        emd5            cogolabs_json                                               liveworks_json
+        1   [{"Hotel manager":"Bender PLC"},{"Immigration officer":"Diaz Ltd"}]     [{"Barrister":"Brown PLC"}]
+
+        """
 
         common_agg_df = common_json_df.select(common_json_df.emd5, common_json_df.cogo_labs_c,
                                                common_json_df.live_works_c) \
@@ -235,6 +310,7 @@ class App(object):
             remove_directory("data/final_output/")
         logger.info("Save final output as csv")
         final_df.repartition(1).write.format("csv").save(os.path.join(DATA_PATH, "final_output"))
+
 
         self.unpersist()
 
