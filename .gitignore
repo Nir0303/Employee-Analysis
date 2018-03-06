@@ -1,3 +1,11 @@
-data/
-spark-warehouse/
+.idea
+
+*.pyc
+
+data/*
+spark-warehouse/*
+metastore_db
+derby.log
+.cache
+.pytest_cache/
 logs/
